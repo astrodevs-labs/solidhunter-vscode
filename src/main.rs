@@ -55,7 +55,7 @@ impl LanguageServer for Backend {
             .log_message(MessageType::INFO, "initialized!")
             .await;
     }
-
+    
     async fn shutdown(&self) -> Result<()> {
         Ok(())
     }
@@ -93,75 +93,43 @@ impl LanguageServer for Backend {
 
 impl Backend {
     async fn on_change(&self, params: TextDocumentItem) {
-        /*let rope = ropey::Rope::from_str(&params.text);
-        self.document_map
-            .insert(params.uri.to_string(), rope.clone());
-        let (ast, errors, semantic_tokens) = parse(&params.text);
-        self.client
-            .log_message(MessageType::INFO, format!("{:?}", errors))
-            .await;
-        let diagnostics = errors
-            .into_iter()
-            .filter_map(|item| {
-            let (message, span) = match item.reason() {
-                chumsky::error::SimpleReason::Unclosed { span, delimiter } => {
-                    (format!("Unclosed delimiter {}", delimiter), span.clone())
-                }
-                chumsky::error::SimpleReason::Unexpected => (
-                format!(
-                    "{}, expected {}",
-                    if item.found().is_some() {
-                        "Unexpected token in input"
-                    } else {
-                        "Unexpected end of input"
-                    },
-                    if item.expected().len() == 0 {
-                        "something else".to_string()
-                    } else {
-                        item.expected()
-                            .map(|expected| match expected {
-                                Some(expected) => expected.to_string(),
-                                None => "end of input".to_string(),
-                            })
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    }),
-                    item.span(),
-                    ),
-                    chumsky::error::SimpleReason::Custom(msg) => (msg.to_string(), item.span()),
-                };
-
-                let diagnostic = || -> Option<Diagnostic> {
-                    // let start_line = rope.try_char_to_line(span.start)?;
-                    // let first_char = rope.try_line_to_char(start_line)?;
-                    // let start_column = span.start - first_char;
-                    let start_position = offset_to_position(span.start, &rope)?;
-                    let end_position = offset_to_position(span.end, &rope)?;
-                    // let end_line = rope.try_char_to_line(span.end)?;
-                    // let first_char = rope.try_line_to_char(end_line)?;
-                    // let end_column = span.end - first_char;
-                    Some(Diagnostic::new_simple(
-                        Range::new(start_position, end_position),
-                        message,
-                    ))
-                }();
-                diagnostic
-            })
-            .collect::<Vec<_>>();
-
-        self.client
-            .publish_diagnostics(params.uri.clone(), diagnostics, Some(params.version))
-            .await;
-
-        if let Some(ast) = ast {
-            self.ast_map.insert(params.uri.to_string(), ast);
+        self.client.log_message(MessageType::INFO, "file changed!").await;
+        // TODO: use solidhunter to generate hunter-diagnostics
+        // and send them to the client
+        
+        // Exemple: 
+        let rope = ropey::Rope::from_str(&params.text);
+        for i in 0..rope.len_lines() {
+            let line = rope.line(i);
+            let line_str = line.to_string();
+            if line_str.contains("dummy") {
+                self.client.log_message(MessageType::INFO, "dummy found!").await;
+                self.client.publish_diagnostics(
+                   params.uri.clone(),
+                    vec![Diagnostic {
+                        range: Range {
+                            start: Position {
+                                line: i as u64 as u32,
+                                character: 0,
+                            },
+                            end: Position {
+                                line: i as u64 as u32,
+                                character: line.len_chars() as u64 as u32,
+                            },
+                        },
+                        severity: Some(DiagnosticSeverity::ERROR),
+                        code: None,
+                        code_description: None,
+                        source: None,
+                        message: "dummy found!".to_string(),
+                        related_information: None,
+                        tags: None,
+                        data: None,
+                    }],
+                    None,
+                ).await;
+            }
         }
-        self.client
-            .log_message(MessageType::INFO, &format!("{:?}", semantic_tokens))
-            .await;
-        self.semantic_token_map
-            .insert(params.uri.to_string(), semantic_tokens);
-        */
     }
 }
 
