@@ -2,13 +2,6 @@ use std::collections::{HashMap, HashSet};
 
 use dashmap::DashMap;
 
-use nrs_language_server::chumsky::{parse, type_inference, Func, ImCompleteSemanticToken, Spanned};
-
-use nrs_language_server::completion::completion;
-use nrs_language_server::jump_definition::{get_definition, get_definition_of_expr};
-use nrs_language_server::reference::get_reference;
-use nrs_language_server::semantic_token::{self, semantic_token_from_ast, LEGEND_TYPE};
-
 use ropey::Rope;
 
 use serde::{Deserialize, Serialize};
@@ -81,7 +74,6 @@ impl LanguageServer for Backend {
     }
 
     async fn did_change(&self, mut params: DidChangeTextDocumentParams) {
-        
         self.on_change(TextDocumentItem {
             uri: params.text_document.uri,
             text: std::mem::take(&mut params.content_changes[0].text),
