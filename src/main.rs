@@ -51,6 +51,7 @@ impl LanguageServer for Backend {
         })
     }
     async fn initialized(&self, _: InitializedParams) {
+        
         self.client
             .log_message(MessageType::INFO, "initialized!")
             .await;
@@ -61,25 +62,25 @@ impl LanguageServer for Backend {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        self.client
-            .log_message(MessageType::INFO, "file opened!")
-            .await;
-        self.on_change(TextDocumentItem {
-            uri: params.text_document.uri,
-            text: params.text_document.text,
-            version: params.text_document.version,
-            language_id: "".to_string(),
-        })
-        .await
+        if params.text_document.uri.as_str().ends_with(".sol") {
+            self.on_change(TextDocumentItem {
+                uri: params.text_document.uri,
+                text: std::mem::take(&mut params.content_changes[0].text),
+                version: params.text_document.version,
+                language_id: "".to_string(),
+            }).await
+        }
     }
 
     async fn did_change(&self, mut params: DidChangeTextDocumentParams) {
-        self.on_change(TextDocumentItem {
-            uri: params.text_document.uri,
-            text: std::mem::take(&mut params.content_changes[0].text),
-            version: params.text_document.version,
-            language_id: "".to_string(),
-        }).await
+        if params.text_document.uri.as_str().ends_with(".sol") {
+            self.on_change(TextDocumentItem {
+                uri: params.text_document.uri,
+                text: std::mem::take(&mut params.content_changes[0].text),
+                version: params.text_document.version,
+                language_id: "".to_string(),
+            }).await
+        }
     }
 
     async fn did_save(&self, _: DidSaveTextDocumentParams) {
@@ -92,44 +93,56 @@ impl LanguageServer for Backend {
 
 
 impl Backend {
+    
+    fn createDiagnostic(diag : lint_result::ResultElem) -> Diagnostic
+    {
+        return Diagnostic {
+            range: tower_lsp::Range {
+                start: tower_lsp::Position {
+                    line: diag.range.start.line as u32,
+                    character: diag.range.start.character as u32,
+                },
+                end: tower_lsp::Position {
+                    line: diag.range.end.line as u32,
+                    character: diag.range.end.character as u32,
+                },
+            },
+            severity: Some(DiagnosticSeverity(diag.severity.into())),
+            code: diag.code.into(),
+            code_description: None,
+            source: diag.source.clone(),
+            message: diag.message.to_string(),
+            related_information: None,
+            tags: None,
+            data: None,
+        };
+    }
+    
     async fn on_change(&self, params: TextDocumentItem) {
         self.client.log_message(MessageType::INFO, "file changed!").await;
-        // TODO: use solidhunter to generate hunter-diagnostics
+        // TODO: use solidhunter to generate hunter-d      iagnostics
         // and send them to the client
         
         // Exemple: 
-        let rope = ropey::Rope::from_str(&params.text);
-        for i in 0..rope.len_lines() {
-            let line = rope.line(i);
-            let line_str = line.to_string();
-            if line_str.contains("dummy") {
-                self.client.log_message(MessageType::INFO, "dummy found!").await;
-                self.client.publish_diagnostics(
-                   params.uri.clone(),
-                    vec![Diagnostic {
-                        range: Range {
-                            start: Position {
-                                line: i as u64 as u32,
-                                character: 0,
-                            },
-                            end: Position {
-                                line: i as u64 as u32,
-                                character: line.len_chars() as u64 as u32,
-                            },
-                        },
-                        severity: Some(DiagnosticSeverity::ERROR),
-                        code: None,
-                        code_description: None,
-                        source: None,
-                        message: "dummy found!".to_string(),
-                        related_information: None,
-                        tags: None,
-                        data: None,
-                    }],
-                    None,
-                ).await;
-            }
-        }
+        let mut diagnostics : Vec<Diagnostic> = Vec::new();
+        let res : LintResult = lint_file(&params.uri.as_str(), &params.text);
+        res.errors.iter().for_each(|diag| {
+            diagnostics.push(createDiagnostic(diag));
+        });
+        res.warnings.iter().for_each(|diag| {
+            diagnostics.push(createDiagnostic(diag));
+        });
+        res.infos.iter().for_each(|diag| {
+            diagnostics.push(createDiagnostic(diag));
+        });
+        res.hints.iter().for_each(|diag| {
+            diagnostics.push(createDiagnostic(diag));
+        });
+        self.client.publish_diagnostics(
+            params.uri.clone(),
+            diagnostics,
+            None,
+        ).await;
     }
 }
 
