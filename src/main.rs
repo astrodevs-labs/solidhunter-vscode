@@ -1,4 +1,8 @@
+mod file_change_event;
+mod lint_result;
+
 use std::collections::{HashMap, HashSet};
+use std::fs;
 
 use dashmap::DashMap;
 
@@ -89,7 +93,7 @@ impl LanguageServer for Backend {
         if params.text_document.uri.as_str().ends_with(".sol") {
             self.on_change(TextDocumentItem {
                 uri: params.text_document.uri,
-                text: std::mem::take(&mut params.content_changes[0].text),
+                text: self.recreateContent(params.text_document.uri.as_string(), params.content_changes),
                 version: params.text_document.version,
                 language_id: "".to_string(),
             }).await
@@ -100,7 +104,7 @@ impl LanguageServer for Backend {
         if params.text_document.uri.as_str().ends_with(".sol") {
             self.on_change(TextDocumentItem {
                 uri: params.text_document.uri,
-                text: std::mem::take(&mut params.content_changes[0].text),
+                text: self.recreateContent(params.text_document.uri.as_string(), params.content_changes),
                 version: params.text_document.version,
                 language_id: "".to_string(),
             }).await
@@ -117,6 +121,18 @@ impl LanguageServer for Backend {
 
 
 impl Backend {
+    fn recreateContent(&self, filepath: String, changes: Vec<TextDocumentContentChangeEvent>) -> String {
+        let mut content = fs::read_to_string(filepath).unwrap();
+        
+        changes.iter().for_each(|change| {
+            let start = change.range.start;
+            let end = change.range.end;
+            let start_index = content.char_indices().nth(start.line as usize).unwrap().0 + start.character as usize;
+            let end_index = content.char_indices().nth(end.line as usize).unwrap().0 + end.character as usize;
+            content.replace_range(start_index..end_index, &change.text);
+        });
+        content
+    }
     
     fn createDiagnostic(diag : lint_result::ResultElem) -> Diagnostic
     {
