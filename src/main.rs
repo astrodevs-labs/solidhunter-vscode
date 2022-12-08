@@ -30,16 +30,16 @@ impl LanguageServer for Backend {
             let res : LintResult = lint_folder(&workspace.uri.as_str());
 
             res.errors.iter().for_each(|diag| {
-            diagnostics.push(createDiagnostic(diag));
+            diagnostics.push(self.createDiagnostic(diag));
             });
             res.warnings.iter().for_each(|diag| {
-                diagnostics.push(createDiagnostic(diag));
+                diagnostics.push(self.createDiagnostic(diag));
             });
             res.infos.iter().for_each(|diag| {
-                diagnostics.push(createDiagnostic(diag));
+                diagnostics.push(self.createDiagnostic(diag));
             });
             res.hints.iter().for_each(|diag| {
-                diagnostics.push(createDiagnostic(diag));
+                diagnostics.push(self.createDiagnostic(diag));
             });
             self.client.publish_diagnostics(
                 params.uri.clone(),
@@ -167,16 +167,16 @@ impl Backend {
         let mut diagnostics : Vec<Diagnostic> = Vec::new();
         let res : LintResult = lint_file(&params.uri.as_str(), &params.text);
         res.errors.iter().for_each(|diag| {
-            diagnostics.push(createDiagnostic(diag));
+            diagnostics.push(self.createDiagnostic(diag));
         });
         res.warnings.iter().for_each(|diag| {
-            diagnostics.push(createDiagnostic(diag));
+            diagnostics.push(self.createDiagnostic(diag));
         });
         res.infos.iter().for_each(|diag| {
-            diagnostics.push(createDiagnostic(diag));
+            diagnostics.push(self.createDiagnostic(diag));
         });
         res.hints.iter().for_each(|diag| {
-            diagnostics.push(createDiagnostic(diag));
+            diagnostics.push(self.createDiagnostic(diag));
         });
         self.client.publish_diagnostics(
             params.uri.clone(),
