@@ -51,7 +51,31 @@ impl LanguageServer for Backend {
         })
     }
     async fn initialized(&self, _: InitializedParams) {
-        
+
+        let mut diagnostics : Vec<Diagnostic> = Vec::new();
+
+        self.client.workspace_folders().iter().for_each(|workspace| {
+            let res : LintResult = lint_folder(&workspace.uri.as_str());
+
+            res.errors.iter().for_each(|diag| {
+            diagnostics.push(createDiagnostic(diag));
+            });
+            res.warnings.iter().for_each(|diag| {
+                diagnostics.push(createDiagnostic(diag));
+            });
+            res.infos.iter().for_each(|diag| {
+                diagnostics.push(createDiagnostic(diag));
+            });
+            res.hints.iter().for_each(|diag| {
+                diagnostics.push(createDiagnostic(diag));
+            });
+            self.client.publish_diagnostics(
+                params.uri.clone(),
+                diagnostics,
+                None,
+            ).await;
+        });
+
         self.client
             .log_message(MessageType::INFO, "initialized!")
             .await;
