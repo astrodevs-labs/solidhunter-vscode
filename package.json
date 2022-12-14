@@ -1,6 +1,6 @@
 {
-  "name": "nrs-language-server",
-  "description": "nano rust language server",
+  "name": "sol-language-server",
+  "description": "solidity language server",
   "license": "MIT",
   "version": "1.5.0",
   "categories": [],
@@ -13,19 +13,19 @@
   },
   "enabledApiProposals": [],
   "activationEvents": [
-    "onLanguage:nrs"
+    "onLanguage:sol"
   ],
   "main": "./client/out/extension.js",
   "contributes": {
     "languages": [
       {
-        "id": "nrs",
-        "extensions": [".nrs"]
+        "id": "sol",
+        "extensions": [".sol"]
       }
     ],
     "configuration": {
       "type": "object",
-      "title": "nrs-language-server",
+      "title": "sol-language-server",
       "properties": {
         "nrs-language-server.trace.server": {
           "type": "string",
@@ -40,7 +40,7 @@
             "Error only",
             "Full log"
           ],
-          "default": "off",
+          "default": "verbose",
           "description": "Traces the communication between VS Code and the language server."
         }
       }

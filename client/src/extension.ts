@@ -17,20 +17,24 @@ export async function activate(context: ExtensionContext) {
 
   const traceOutputChannel = window.createOutputChannel("Solidhunter Server Trace");
   const command = process.env.SERVER_PATH || "solidhunter-lsp";
+  let debugOptions = ['--nolazy', '--inspect=6009', '--debug-brk=3456'];
+
   const run: Executable = {
     command,
+    args: debugOptions,
     options: {
       env: {
         ...process.env,
         // eslint-disable-next-line @typescript-eslint/naming-convention
         RUST_LOG: "debug",
-      },
+        RUST_BACKTRACE: 1
+        }
     },
   };
 
   const serverOptions: ServerOptions = {
     run,
-    debug: run,
+    debug: run
   };
   // If the extension is launched in debug mode then the debug server options are used
   // Otherwise the run options are used
