@@ -1,5 +1,8 @@
+use std::borrow::BorrowMut;
 use std::fs;
 use std::cell::RefCell;
+use std::ops::Add;
+use glob::glob;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
@@ -54,8 +57,6 @@ impl LanguageServer for Backend {
         })
     }
     async fn initialized(&self, _: InitializedParams) {
-        warn!("Linting project ...");
-        let mut diagnostics: Vec<Diagnostic> = Vec::new();
         let mut lint_results: Vec<LintResult> = Vec::new();
         let mut root_path = String::new();
 
@@ -65,35 +66,37 @@ impl LanguageServer for Backend {
         warn!("Linting started on folder: {}", root_path);
         
         if root_path != "" {
-            let linter = self.linter.lock().unwrap();
-            lint_results = linter.borrow_mut().parse_folder(root_path.to_string());
+            let mut linter = self.linter.lock().unwrap();
+            let mut linter = linter.borrow_mut();
+            for entry in glob(&*(root_path.to_string() + "/**/*.sol")) {
+                for path in entry {
+                    warn!("Linting file: {:?}", path);
+                    lint_results.push(linter.get_mut().parse_file(String::from(path.unwrap().into_os_string().into_string().unwrap())));
+                }
+            }
         } else {
             error!("No root path found");
         }
-        warn!("Linting finished");
         for lint_result in lint_results {
             match lint_result {
                 Ok(diags) => {
+                    let mut diag_vec: Vec<Diagnostic> = Vec::new();
+                    let mut f_uri = Url::from_str("file://").unwrap();
                     diags.into_iter().for_each(|diag| { 
                         warn!("Found error: {}", diag.message);
-                        diagnostics.push(Backend::create_diagnostic(diag));
+                        if f_uri.as_str() == "file://"{
+                            let tmp = String::from("file://") + diag.uri.as_str();
+                            f_uri = Url::from_str(tmp.as_str()).unwrap_or(Url::from_str("file://").unwrap());
+                        }
+                        diag_vec.push(Backend::create_diagnostic(diag));
                     });
+                    self.client.publish_diagnostics(f_uri, diag_vec, None).await;
                 }
                 Err(e) => {
-                    self.client
-                        .log_message(MessageType::ERROR, e)
-                        .await;
+                    error!("Error while linting: {:?}", e);
                 }
             }
         }
-
-
-        self.client
-            .publish_diagnostics(
-            Url::from_str(root_path.as_str()).unwrap_or(Url::parse("file:///").unwrap()),
-            diagnostics,
-            None)
-            .await;
 
        warn!("finished initialization");
     }
@@ -116,15 +119,21 @@ impl LanguageServer for Backend {
     async fn did_change(&self, mut params: DidChangeTextDocumentParams) {
         warn!("file changed!");
         self.on_change(TextDocumentItem {
-            uri: params.text_document.uri,
-            text: std::mem::take(&mut params.content_changes[0].text),
-            version: params.text_document.version,
+            uri: params.text_document.clone().uri,
+            text: self.recreate_content(params.text_document.clone().uri.path().to_string(), params.content_changes.clone()),
+            version: params.text_document.clone().version,
             language_id: "".to_string(),
         }).await
     }
 
-    async fn did_save(&self, _: DidSaveTextDocumentParams) {
+    async fn did_save(&self, params: DidSaveTextDocumentParams) {
        warn!("file saved!");
+        self.on_change(TextDocumentItem {
+            uri: params.text_document.clone().uri,
+            text: params.text.unwrap(),
+            version: 0,
+            language_id: "".to_string(),
+        }).await
     }
 
     async fn completion(&self, _: CompletionParams) -> Result<Option<CompletionResponse>> {
@@ -142,7 +151,7 @@ impl Backend {
     pub async fn init_config(&self, folders : &Vec<WorkspaceFolder>) -> String {
 
         if folders.len() <= 0 {
-            self.client.log_message(MessageType::ERROR, "No workspace folder found").await;
+            error!("No workspace folder found.");
             return String::new();
         }
 
@@ -150,13 +159,24 @@ impl Backend {
         
         if path != "" {
             let mut linter = self.linter.lock().unwrap();
-            linter.borrow_mut().initalize(&path);
+            let mut linter = linter.borrow_mut();
+            linter.get_mut().initalize(&path);
         } else if path == "" {
-            self.client.log_message(MessageType::ERROR, "No config file found").await;
+            error!("No config file found.");
         }
         
-        warn!("Config file found at: {}", path);
         folders[0].clone().uri.path().to_string()
+    }
+
+    fn recreate_content(&self, filepath: String, changes: Vec<TextDocumentContentChangeEvent>) -> String {
+        warn!("Recreating content for file: {}", filepath);
+        let mut content = fs::read_to_string(filepath).unwrap();
+
+        for change in changes {
+            return change.text;
+        }
+        warn!("new file Content: {}", content);
+        content
     }
     
     fn create_diagnostic(diag : LintDiag) -> Diagnostic
@@ -173,14 +193,14 @@ impl Backend {
                 },
             },
             severity: Some(match diag.severity.unwrap() {
-                Severity::ERROR => {DiagnosticSeverity::ERROR}
-                Severity::WARNING => {DiagnosticSeverity::WARNING}
+                _ => {DiagnosticSeverity::ERROR}
+                /*Severity::WARNING => {DiagnosticSeverity::WARNING}
                 Severity::INFO => {DiagnosticSeverity::INFORMATION}
-                Severity::HINT => {DiagnosticSeverity::HINT}
+                Severity::HINT => {DiagnosticSeverity::HINT}*/
             }),
             code: None,
             code_description: None,
-            source: diag.source.clone(),
+            source: None,
             message: diag.message.to_string(),
             related_information: None,
             tags: None,
@@ -197,9 +217,33 @@ impl Backend {
     }
     
     async fn on_change(&self, params: TextDocumentItem) {
-        // TODO: use solidhunter to generate hunter-diagnostics
-        // and send them to the client
-        
+        let res : LintResult;
+        let mut diagnostics : Vec<Diagnostic> = Vec::new();
+        {
+            let mut linter = self.linter.lock().unwrap();
+            warn!("Linting file: {}\n Content: {}", params.uri.path(), &params.text);
+            res = linter.get_mut().parse_file(params.uri.path().to_string());
+        }
+        match res {
+            Ok(diags) => {
+                diags.into_iter().for_each(|diag| {
+                    warn!("Found error: {}", diag.message);
+                    let f_diag = Backend::create_diagnostic(diag);
+                    warn!("Found error: {:?}", f_diag);
+                    diagnostics.push(f_diag);
+                });
+                self.client.publish_diagnostics(
+                    params.uri.clone(),
+                    diagnostics,
+                    None,
+                ).await;
+            }
+            Err(e) => {
+                error!("Error while linting: {:?}", e);
+            }
+        }
+
+        /*
         // Exemple: 
         let rope = Rope::from_str(&params.text);
         for i in 0..rope.len_lines() {
@@ -231,7 +275,7 @@ impl Backend {
                     None,
                 ).await;
             }
-        }
+        }*/
     }
 }
 

@@ -1467,7 +1467,7 @@ dependencies = [
 [[package]]
 name = "solc-wrapper"
 version = "0.1.0"
-source = "git+https://github.com/astrodevs-labs/solidhunter?branch=fix/extention-fixes#7248707b7bdc1f421308bd4307c2a317e0967e4b"
+source = "git+https://github.com/astrodevs-labs/solidhunter?branch=fix/extention-fixes#1f63939da193b018e9363f142cc3bf7c9c300dda"
 dependencies = [
  "anyhow",
  "hex",
@@ -1485,7 +1485,7 @@ dependencies = [
 [[package]]
 name = "solidhunter-lib"
 version = "0.0.1"
-source = "git+https://github.com/astrodevs-labs/solidhunter?branch=fix/extention-fixes#7248707b7bdc1f421308bd4307c2a317e0967e4b"
+source = "git+https://github.com/astrodevs-labs/solidhunter?branch=fix/extention-fixes#1f63939da193b018e9363f142cc3bf7c9c300dda"
 dependencies = [
  "anyhow",
  "clap 4.0.29",
@@ -1502,6 +1502,7 @@ name = "solidhunter-lsp"
 version = "0.1.0"
 dependencies = [
  "env_logger",
+ "glob",
  "im-rc",
  "log",
  "ropey",
