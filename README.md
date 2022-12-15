@@ -1,1 +1,0 @@
-# solidhunter-vscode
