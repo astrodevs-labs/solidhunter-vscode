@@ -25,7 +25,7 @@ import {
 } from 'vscode-languageserver-textdocument';
 import { exec } from 'child_process';
 import { resolve } from 'path';
-
+import * as fs from 'fs';
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
 const connection = createConnection(ProposedFeatures.all);
@@ -67,6 +67,8 @@ let configPath = "";
   },
 
 */
+
+
 const lint_file = async (filepath: string) : Promise<Diagnostic[]> => {
 	return new Promise<Diagnostic[]>(async (resolve, reject) => {
 		if (configPath === "")
@@ -94,7 +96,7 @@ const lint_file = async (filepath: string) : Promise<Diagnostic[]> => {
 					out_diags.forEach((elem: any) => {
 						const diagnostic: Diagnostic = {
 							severity: severity_to_value(elem.severity),
-							range: Range.create(elem.range.start.line, elem.range.start.character, elem.range.end.line, elem.range.end.character),					
+							range: Range.create(elem.range.start.line - 1, elem.range.start.character, elem.range.end.line - 1, elem.range.end.character),					
 							message: elem.message,
 							source: 'solidhunter'
 						};
