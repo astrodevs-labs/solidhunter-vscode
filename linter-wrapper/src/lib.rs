@@ -67,7 +67,7 @@ impl VSSolid_Diag {
 
 
 
-pub extern fn lint_file(path: *const c_char, config: *const c_char) -> [VSSolid_Diag; 100] {
+pub extern fn lint_file(path: *const c_char, config: *const c_char) -> *const VSSolid_Diag {
     let mut diags : Vec<VSSolid_Diag> = Vec::new();
     let input_cstring: &CStr = unsafe {
         // Wraps a raw C-string with a safe C string wrapper
@@ -84,27 +84,16 @@ pub extern fn lint_file(path: *const c_char, config: *const c_char) -> [VSSolid_
     let mut linter : SolidLinter = SolidLinter::new();
     let config_string = String::from(config_str);
     linter.initalize(&config_string);
-
     let lint_result = linter.parse_file(String::from(path_str));
     
     match lint_result {
         Ok(solid_diags) => {
-            let mut nb = 0;
             for diag in solid_diags {
                 let res_diag = VSSolid_Diag::from(diag);
                 diags.push(res_diag);
-                nb += 1;
-            }
-            loop {
-                if nb == 99 {
-                    break;
-                }
-                diags.push(VSSolid_Diag::empty());
-                nb += 1;
             }
         },
         Err(err) => {
-            let mut nb = 1;
             diags.push(VSSolid_Diag { 
                 empty: false,
                 start_line: 0,
@@ -114,15 +103,8 @@ pub extern fn lint_file(path: *const c_char, config: *const c_char) -> [VSSolid_
                 severity: Severity::ERROR as i64,
                 message: CString::new(err.to_string()).unwrap().into_raw()
             });
-            loop {
-                if nb == 99 {
-                    break;
-                }
-                diags.push(VSSolid_Diag::empty());
-                nb += 1;
-            }
+
         },
     }
-    diags.try_into().unwrap()
-
+    diags.as_ptr()
 }

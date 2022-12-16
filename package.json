@@ -47,15 +47,17 @@
                 }
             }
         },
-        "languages": [{
-            "id": "sol",
-            "aliases": [
-                "Solidity"
-            ],
-            "extensions": [
-                ".sol"
-            ]
-        }]
+        "languages": [
+            {
+                "id": "sol",
+                "aliases": [
+                    "Solidity"
+                ],
+                "extensions": [
+                    ".sol"
+                ]
+            }
+        ]
     },
     "scripts": {
         "vscode:prepublish": "npm run compile",
@@ -73,5 +75,11 @@
         "eslint": "^8.26.0",
         "mocha": "^9.2.1",
         "typescript": "^4.8.4"
+    },
+    "dependencies": {
+        "ffi-napi": "^4.0.3",
+        "ref-array-napi": "^1.2.2",
+        "ref-napi": "^3.0.3",
+        "ref-struct-napi": "^1.1.1"
     }
 }
