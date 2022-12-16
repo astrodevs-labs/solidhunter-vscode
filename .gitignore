@@ -1,6 +1,4 @@
-/target
+out
 node_modules
-out/
-.pnpm-debug.log
-*.ast 
-*.nrs
+client/server
+.vscode-test
