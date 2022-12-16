@@ -1,4 +1,4 @@
-import ffi = require('ffi-napi');
+const ffi = require('ffi-napi');
 import ref = require('ref-napi');
 //import StructType = require('ref-struct-napi');
 const ArrayType = require('ref-array-di')(ref);

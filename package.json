@@ -14,7 +14,7 @@
         "multi-root ready"
     ],
     "engines": {
-        "vscode": "^1.74.0"
+        "vscode": "^1.63.0"
     },
     "activationEvents": [
         "onLanguage:sol",
@@ -68,6 +68,7 @@
         "test": "sh ./scripts/e2e.sh"
     },
     "devDependencies": {
+        "@types/ffi-napi": "^4.0.7",
         "@types/mocha": "^9.1.0",
         "@types/node": "^16.11.7",
         "@types/ref-array-di": "^1.2.5",
