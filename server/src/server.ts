@@ -16,16 +16,101 @@ import {
 	TextDocumentPositionParams,
 	TextDocumentSyncKind,
 	InitializeResult,
-	DidChangeTextDocumentNotification
+	DidChangeTextDocumentNotification,
+	Range
 } from 'vscode-languageserver/node';
 
 import {
 	TextDocument
 } from 'vscode-languageserver-textdocument';
+import { exec } from 'child_process';
+import { resolve } from 'path';
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
 const connection = createConnection(ProposedFeatures.all);
+
+const linterPath = "/home/mindblower78/Documents/astrodevs-labs/solidhunter/target/release/solidhunter";
+
+const severity_to_value = (value: string) => {
+	if (value == "WARNING") {
+		return 2;
+	} else if (value == "ERROR") {
+		return 1;
+	} else if (value == "INFO") {
+		return 3;
+	} else if (value == "HINT") {
+		return 4;
+	}
+	return 1;
+};
+
+
+let configPath = "";
+/*
+{
+    "range": {
+      "start": {
+        "line": 4,
+        "character": 9
+      },
+      "end": {
+        "line": 5,
+        "character": 5
+      },
+      "length": 5
+    },
+    "severity": "WARNING",
+    "message": "Contract name need to be in pascal case",
+    "uri": "test.sol",
+    "sourceFileContent": "//SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract Test_ {\n    function Test_() {\n        \n    }\n}"
+  },
+
+*/
+const lint_file = async (filepath: string) : Promise<Diagnostic[]> => {
+	return new Promise<Diagnostic[]>(async (resolve, reject) => {
+		if (configPath === "")
+		{
+			const folders = await connection.workspace.getWorkspaceFolders();
+			if (folders)
+				configPath = folders[0].uri.replace('file://', '') + "/.solidhunter.json";
+		}
+		const diags : Diagnostic[] = [];
+		exec(linterPath + " -j -f " +  filepath + " -r " + configPath, (err, out, err_out) => {
+			if (err) {
+				console.log(err);
+			}
+			if (out) {
+				console.log("OUTPUT: \n" + out);
+				let out_diags;
+				if (out[0] != 'E') {
+					out_diags = JSON.parse(out);
+				} else {
+					out_diags = undefined;
+				}
+			if (out_diags != undefined)
+				{
+					console.log("OUTPUT JSON: \n" + out_diags);
+					out_diags.forEach((elem: any) => {
+						const diagnostic: Diagnostic = {
+							severity: severity_to_value(elem.severity),
+							range: Range.create(elem.range.start.line, elem.range.start.character, elem.range.end.line, elem.range.end.character),					
+							message: elem.message,
+							source: 'solidhunter'
+						};
+						diags.push(diagnostic);
+					});
+				}
+			}
+			if (err_out) {
+				console.log(`error with cmd : ${err_out}`);
+			}
+			console.log("generated : " + diags.length + " diags");
+			resolve(diags);
+		});
+	});
+	
+};
 
 // Create a simple text document manager.
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
@@ -36,6 +121,8 @@ let hasDiagnosticRelatedInformationCapability = false;
 
 
 connection.onInitialize((params: InitializeParams) => {
+	if (params.workspaceFolders)
+		configPath = params.workspaceFolders[0].uri.replace('file://', '') + "/.solidhunter.json";
 	const capabilities = params.capabilities;
 
 	// Does the client support the `workspace/configuration` request?
@@ -144,8 +231,15 @@ documents.onDidClose(e => {
 // The content of a text document has changed. This event is emitted
 // when the text document first opened or when its content has changed.
 documents.onDidChangeContent(change => {
-	connection.console.error("kappa");
-	validateTextDocument(change.document);
+	connection.console.log('File changed');
+});
+
+documents.onDidSave(file => {
+	validateTextDocument(file.document);
+});
+
+documents.onDidOpen(file => {
+	validateTextDocument(file.document);
 });
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
@@ -157,40 +251,9 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	const pattern = /\b[A-Z]{2,}\b/g;
 	let m: RegExpExecArray | null;
 
-	let problems = 0;
-	const diagnostics: Diagnostic[] = [];
-	while ((m = pattern.exec(text)) && problems < settings.maxNumberOfProblems) {
-		problems++;
-		const diagnostic: Diagnostic = {
-			severity: DiagnosticSeverity.Warning,
-			range: {
-				start: textDocument.positionAt(m.index),
-				end: textDocument.positionAt(m.index + m[0].length)
-			},
-			message: `${m[0]} is all uppercase.`,
-			source: 'ex'
-		};
-		if (hasDiagnosticRelatedInformationCapability) {
-			diagnostic.relatedInformation = [
-				{
-					location: {
-						uri: textDocument.uri,
-						range: Object.assign({}, diagnostic.range)
-					},
-					message: 'Spelling matters'
-				},
-				{
-					location: {
-						uri: textDocument.uri,
-						range: Object.assign({}, diagnostic.range)
-					},
-					message: 'Particularly for names'
-				}
-			];
-		}
-		diagnostics.push(diagnostic);
-	}
+	const diagnostics: Diagnostic[] = await lint_file(textDocument.uri.replace('file://', ''));
 
+	console.log("diag nb: " + diagnostics.length);
 	// Send the computed diagnostics to VSCode.
 	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
 }
